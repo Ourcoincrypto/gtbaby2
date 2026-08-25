@@ -1,1 +1,188 @@
-<!DOCTYPE html><html class="optimisticai_d4925249-module__omuUYW__variable optimisticmono_9b82a078-module__K58pLa__variable light antialiased" data-style="default" data-accent-color="blue"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Game</title><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"><style>body{font-family:Arial,sans-serif;margin:0;padding:20px;background-color:#f0f0f0}#gameContainer{max-width:800px;margin:0 auto;background-color:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1)}</style></head><body><div id="gameContainer"><h1>Game</h1></div></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>BABY MAYHEM: Cradle of Chaos — 3D</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; font-family: system-ui; }
+    canvas { display: block; }
+    #title { 
+      position: absolute; 
+      top: 0; left: 0; 
+      width: 100%; height: 100%; 
+      background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+      display: flex; 
+      flex-direction: column; 
+      justify-content: center; 
+      align-items: center; 
+      color: #fff; 
+      z-index: 300;
+      pointer-events: auto;
+    }
+    #title h1 { font-size: 3em; margin: 0; color: #ff006e; text-shadow: 0 0 20px #ff006e; }
+    #title button { 
+      margin-top: 30px; 
+      padding: 15px 40px; 
+      font-size: 1.5em; 
+      background: #ff006e; 
+      border: none; 
+      border-radius: 8px; 
+      color: white; 
+      cursor: pointer; 
+      box-shadow: 0 0 20px #ff006e;
+    }
+    #hud { position: absolute; top: 10px; left: 10px; color: #0f0; font-family: monospace; z-index: 100; pointer-events: none; }
+    #mobile { position: absolute; bottom: 20px; width: 100%; display: none; z-index: 200; }
+    @media (max-width: 768px) { #mobile { display: flex; justify-content: space-between; padding: 0 20px; } }
+    .joy { width: 100px; height: 100px; background: rgba(255,255,255,0.2); border-radius: 50%; }
+    .btn { padding: 20px 30px; background: #ff006e; border-radius: 12px; color: white; font-weight: bold; }
+  </style>
+  <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
+  <script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+  </script>
+</head>
+<body>
+  <div id="title">
+    <h1>BABY MAYHEM</h1>
+    <p>Cradle of Chaos — 3D</p>
+    <button id="startBtn">WAKE UP</button>
+  </div>
+  <div id="hud">Health: 100 | Chaos: 0</div>
+  <div id="mobile">
+    <div class="joy" id="joystick"></div>
+    <div>
+      <div class="btn" id="jumpBtn">JUMP</div>
+      <div class="btn" id="mountBtn" style="margin-top:10px;">MOUNT</div>
+    </div>
+  </div>
+  <script type="module">
+    import * as THREE from 'three';
+    
+    // === BASIC SCENE SETUP ===
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // === LIGHTS ===
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(5, 10, 7);
+    scene.add(light, new THREE.AmbientLight(0x404040));
+
+    // === FLOOR ===
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(100, 100),
+      new THREE.MeshStandardMaterial({ color: 0x7cfc00 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    // === TOY STORE ===
+    const store = new THREE.Mesh(
+      new THREE.BoxGeometry(10, 6, 8),
+      new THREE.MeshStandardMaterial({ color: 0x8b00ff })
+    );
+    store.position.set(20, 3, 0);
+    scene.add(store);
+
+    // === BABY CHARACTER ===
+    const baby = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 0.6, 4, 8), new THREE.MeshStandardMaterial({ color: 0xffdbac }));
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.5), new THREE.MeshStandardMaterial({ color: 0xffdbac }));
+    head.position.y = 1;
+    baby.add(body, head);
+    baby.position.set(0, 0.8, 0);
+    scene.add(baby);
+
+    // === MOTORCYCLE ===
+    const bike = new THREE.Mesh(
+      new THREE.BoxGeometry(1.5, 0.8, 3),
+      new THREE.MeshStandardMaterial({ color: 0xff0000 })
+    );
+    bike.position.set(22, 0.4, 0);
+    scene.add(bike);
+
+    camera.position.set(0, 5, 10);
+    camera.lookAt(baby.position);
+
+    // === CONTROLS ===
+    const keys = {};
+    document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+    document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+    
+    let velocity = new THREE.Vector3();
+    let onBike = false;
+
+    document.getElementById('startBtn').onclick = () => {
+      document.getElementById('title').style.display = 'none';
+    };
+
+    document.getElementById('jumpBtn').ontouchstart = () => jump();
+    document.getElementById('mountBtn').ontouchstart = () => mountBike();
+    window.addEventListener('keydown', e => { 
+      if (e.key === ' ') jump(); 
+      if (e.key === '6') mountBike(); 
+    });
+
+    function jump() {
+      if (baby.position.y <= 0.8) velocity.y = 0.3;
+    }
+    
+    function mountBike() {
+      if (baby.position.distanceTo(bike.position) < 3) {
+        onBike = !onBike;
+        if (onBike) {
+          baby.position.copy(bike.position);
+          baby.position.y += 1;
+        }
+      }
+    }
+
+    // === GAME LOOP ===
+    function animate() {
+      requestAnimationFrame(animate);
+      
+      // Movement
+      const speed = onBike ? 0.3 : 0.1;
+      if (keys['w']) velocity.z = -speed;
+      if (keys['s']) velocity.z = speed;
+      if (keys['a']) velocity.x = -speed;
+      if (keys['d']) velocity.x = speed;
+      
+      if (onBike) {
+        bike.position.add(velocity);
+        baby.position.copy(bike.position);
+        baby.position.y = 1.4;
+        camera.position.lerp(new THREE.Vector3(bike.position.x, bike.position.y + 5, bike.position.z + 10), 0.1);
+      } else {
+        baby.position.add(velocity);
+        camera.position.lerp(new THREE.Vector3(baby.position.x, baby.position.y + 5, baby.position.z + 10), 0.1);
+      }
+      camera.lookAt(onBike ? bike.position : baby.position);
+      
+      // Gravity
+      velocity.y -= 0.01;
+      baby.position.y += velocity.y;
+      if (baby.position.y < 0.8) { baby.position.y = 0.8; velocity.y = 0; }
+      
+      velocity.multiplyScalar(0.9); // friction
+      
+      // Hide store walls when close
+      store.visible = baby.position.distanceTo(store.position) > 8;
+      
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
